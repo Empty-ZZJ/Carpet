@@ -1,14 +1,12 @@
-﻿// Copyright (c) Microsoft Corporation.
-// Licensed under the MIT license.
-
-using System;
+﻿using System;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 
 namespace Tsavorite.core
 {
-    internal unsafe struct InternalHashTable
+    unsafe struct InternalHashTable
     {
         public long size;
         public long size_mask;
@@ -66,7 +64,7 @@ namespace Tsavorite.core
             overflowBucketsAllocator.Dispose();
         }
 
-        private void Free(int version)
+        void Free(int version)
         {
         }
 
@@ -94,12 +92,32 @@ namespace Tsavorite.core
         }
 
         /// <summary>
-        /// Initialize
+        /// Initialize，修复了内存溢出的问题
         /// </summary>
         /// <param name="version"></param>
         /// <param name="size"></param>
         /// <param name="sector_size"></param>
         internal void Initialize(int version, long size, int sector_size)
+        {
+            var size_bytes = size * sizeof(HashBucket);
+            var aligned_size_bytes = sector_size + ((size_bytes + (sector_size - 1)) & ~(sector_size - 1));
+
+            // 预分配并按照缓存行对齐表格
+            state[version].size = size;
+            state[version].size_mask = size - 1;
+            state[version].size_bits = Utility.GetLogBase2((int)size);
+
+            var unmanagedMemory = Marshal.AllocHGlobal((int)(aligned_size_bytes / Constants.kCacheLineBytes) * sizeof(HashBucket));
+            var sectorAlignedPointer = ((long)unmanagedMemory + (sector_size - 1)) & ~(sector_size - 1);
+            state[version].tableAligned = (HashBucket*)sectorAlignedPointer;
+        }
+        /// <summary>
+        /// 老的初始化方法，有内存溢出的问题
+        /// </summary>
+        /// <param name="version"></param>
+        /// <param name="size"></param>
+        /// <param name="sector_size"></param>
+        internal void _Initialize(int version, long size, int sector_size)
         {
             long size_bytes = size * sizeof(HashBucket);
             long aligned_size_bytes = sector_size +
@@ -115,11 +133,10 @@ namespace Tsavorite.core
             state[version].tableAligned = (HashBucket*)sectorAlignedPointer;
         }
 
-        /// <summary>
-        /// A helper function that is used to find the slot corresponding to a
-        /// key in the specified version of the hash table
+        ///<summary>
+        /// 一个辅助函数，用于在指定版本的哈希表中查找与键对应的插槽
         /// </summary>
-        /// <returns>true if such a slot exists, and populates <paramref name="hei"/>, else returns false</returns>
+        ///<returns>如果存在这样的插槽，则返回true<paramref name="hei"/>，否则返回false</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal bool FindTag(ref HashEntryInfo hei)
         {
@@ -134,7 +151,7 @@ namespace Tsavorite.core
 
             do
             {
-                // Search through the bucket looking for our key. Last entry is reserved for the overflow pointer.
+                // 在桶中搜索键。最后一个条目是为溢出指针保留的。
                 for (int index = 0; index < Constants.kOverflowBucketIndex; ++index)
                 {
                     target_entry_word = *(((long*)hei.bucket) + index);
@@ -149,11 +166,11 @@ namespace Tsavorite.core
                     }
                 }
 
-                // Go to next bucket in the chain (if it is a nonzero overflow allocation)
+                // 转到链中的下一个桶（如果它是一个非零溢出分配）
                 target_entry_word = *(((long*)hei.bucket) + Constants.kOverflowBucketIndex) & Constants.kAddressMask;
                 if (target_entry_word == 0)
                 {
-                    // We lock the firstBucket, so it can't be cleared.
+                    // 我们锁定第一个桶，所以它不能被清除。
                     hei.bucket = default;
                     hei.entry = default;
                     return false;
@@ -161,7 +178,6 @@ namespace Tsavorite.core
                 hei.bucket = (HashBucket*)overflowBucketsAllocator.GetPhysicalAddress(target_entry_word);
             } while (true);
         }
-
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void FindOrCreateTag(ref HashEntryInfo hei, long BeginAddress)
         {
@@ -177,22 +193,22 @@ namespace Tsavorite.core
                 if (FindTagOrFreeInternal(ref hei, BeginAddress))
                     return;
 
-                // Install tentative tag in free slot
+                // 在空闲插槽中安装临时标签
                 hei.entry = default;
                 hei.entry.Tag = hei.tag;
                 hei.entry.Address = Constants.kTempInvalidAddress;
                 hei.entry.Tentative = true;
 
-                // Insert the tag into this slot. Failure means another session inserted a key into that slot, so continue the loop to find another free slot.
+                // 将此标签插入到此插槽中。失败意味着另一个会话将键插入到该插槽中，因此继续循环以查找另一个空闲插槽。
                 if (0 == Interlocked.CompareExchange(ref hei.bucket->bucket_entries[hei.slot], hei.entry.word, 0))
                 {
-                    // Make sure this tag isn't in a different slot already; if it is, make this slot 'available' and continue the search loop.
+                    // 确保此标签不在其他插槽中；如果是，则将此插槽设为“可用”并继续搜索循环。
                     var orig_bucket = state[version].tableAligned + masked_entry_word;  // TODO local var not used; use or change to byval param
                     var orig_slot = Constants.kInvalidEntrySlot;                        // TODO local var not used; use or change to byval param
 
                     if (FindOtherSlotForThisTagMaybeTentativeInternal(hei.tag, ref orig_bucket, ref orig_slot, hei.bucket, hei.slot))
                     {
-                        // We own the slot per CAS above, so it is OK to non-CAS the 0 back in
+                        // 我们通过CAS拥有此插槽，因此可以非CAS将0放回
                         hei.bucket->bucket_entries[hei.slot] = 0;
                         // TODO: Why not return orig_bucket and orig_slot if it's not Tentative?
                     }
@@ -211,7 +227,7 @@ namespace Tsavorite.core
         /// </summary>
         /// <returns>If found, return the slot it is in, else return a pointer to some empty slot (which we may have allocated)</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool FindTagOrFreeInternal(ref HashEntryInfo hei, long BeginAddress = 0)
+        bool FindTagOrFreeInternal(ref HashEntryInfo hei, long BeginAddress = 0)
         {
             var target_entry_word = default(long);
             var entry_slot_bucket = default(HashBucket*);
@@ -306,7 +322,7 @@ namespace Tsavorite.core
         /// </summary>
         /// <returns>True if found, else false. Does not return a free slot.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private bool FindOtherSlotForThisTagMaybeTentativeInternal(ushort tag, ref HashBucket* bucket, ref int slot, HashBucket* except_bucket, int except_entry_slot)
+        bool FindOtherSlotForThisTagMaybeTentativeInternal(ushort tag, ref HashBucket* bucket, ref int slot, HashBucket* except_bucket, int except_entry_slot)
         {
             var target_entry_word = default(long);
             var entry_slot_bucket = default(HashBucket*);

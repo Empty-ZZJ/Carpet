@@ -3,6 +3,7 @@
 
 using System;
 using System.Threading;
+using Garnet.common;
 using Garnet.server;
 
 namespace Garnet
@@ -12,8 +13,10 @@ namespace Garnet
     /// </summary>
     class Program
     {
+
         static void Main(string[] args)
         {
+
             try
             {
                 using var server = new GarnetServer(args);
@@ -28,8 +31,10 @@ namespace Garnet
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Unable to initialize server due to exception: {ex.Message}");
+                Utils_Console.WriteErrorLine("Faile to start:" + ex.Message);
             }
+
+
         }
 
         /// <summary>

@@ -21,20 +21,22 @@ namespace Garnet
     {
         internal GarnetProvider Provider;
 
-        private readonly GarnetServerOptions opts;
-        private IGarnetServer server;
-        private TsavoriteKV<SpanByte, SpanByte> store;
-        private TsavoriteKV<byte[], IGarnetObject> objectStore;
-        private IDevice aofDevice;
-        private TsavoriteLog appendOnlyFile;
-        private SubscribeKVBroker<SpanByte, SpanByte, SpanByte, IKeyInputSerializer<SpanByte, SpanByte>> kvBroker;
-        private SubscribeBroker<SpanByte, SpanByte, IKeySerializer<SpanByte>> broker;
-        private LogSettings logSettings, objLogSettings;
-        private INamedDeviceFactory logFactory;
-        private MemoryLogger initLogger;
-        private ILogger logger;
-        private readonly ILoggerFactory loggerFactory;
-        private bool disposeLoggerFactory;
+        readonly GarnetServerOptions opts;
+        IGarnetServer server;
+        TsavoriteKV<SpanByte, SpanByte> store;
+        TsavoriteKV<byte[], IGarnetObject> objectStore;
+        IDevice aofDevice;
+        TsavoriteLog appendOnlyFile;
+        SubscribeKVBroker<SpanByte, SpanByte, SpanByte, IKeyInputSerializer<SpanByte, SpanByte>> kvBroker;
+        SubscribeBroker<SpanByte, SpanByte, IKeySerializer<SpanByte>> broker;
+        LogSettings logSettings, objLogSettings;
+        INamedDeviceFactory logFactory;
+        MemoryLogger initLogger;
+        ILogger logger;
+        readonly ILoggerFactory loggerFactory;
+        bool disposeLoggerFactory;
+        public const string HelloWorld = "         tj        tt  tt  tttttttti ttttttttttttt itt            tttt          tttttttttttt:       \r\n         tt.       ttt ttt ttttttttt ttttttttttttt ttt           tttttt         ttttttttttttt       \r\n         tt.       ttt ttt :tttttttt ,ttttttttttt, ttt            tttttt        jttttttttttt        \r\n         tt.       ttt ttt       ttt      ttt      ttt               tttj            ttt            \r\n         tt. ttttttttt ttt       ttt      ttt      ttt            tt  tttt           ttt            \r\n         tt. jtttttttt ttt       ttt      ttt      ttt           ttt   tttt          ttt            \r\n         tt. ttttttttt ttt       tt;      ttt      itt           ttt    tttt         tt             \r\n         tt.       ttt ttt                                       ttt     jttt                       \r\n         tt.       ttt ttt;;;;;;;;;   ;;;;;;;;;;;   ;;;;;;;;;;;  ttt  .;;itttt  .;;;;;;;;;;;        \r\n         tt.       ttt ttttttttttttj ttttttttttttt ttttttttttttt ttt  tttttttt. ttttttttttttt       \r\n         tj        tt: ttttttttttttj ttttttttttttt jtttttttttttt ,tt  tttttttt  ttttttttttttt  \n花濑游戏 - 二次元赛高！\nHOILAI GAMES - ACGN IS THE BEST！";
+
 
         /// <summary>
         /// Store and associated information used by this Garnet server
@@ -130,7 +132,7 @@ namespace Garnet
             this.InitializeServer();
         }
 
-        private void InitializeServer()
+        void InitializeServer()
         {
             Debug.Assert(opts != null);
 
@@ -139,15 +141,10 @@ namespace Garnet
                 var red = "\u001b[31m";
                 var magenta = "\u001b[35m";
                 var normal = "\u001b[0m";
+                Console.WriteLine(HelloWorld);
 
-                Console.WriteLine($@"{red}    _________
-   /_||___||_\      {normal}Garnet {version} {(IntPtr.Size == 8 ? "64" : "32")} bit; {(opts.EnableCluster ? "cluster" : "standalone")} mode{red}
-   '. \   / .'      {normal}Port: {opts.Port}{red}
-     '.\ /.'        {magenta}https://aka.ms/GetGarnet{red}
-       '.'
-{normal}");
             }
-
+            Utils_Console.WriteSuccessLine($"\n Carpet {version} {(IntPtr.Size == 8 ? "64" : "32")} bit; {(opts.EnableCluster ? "cluster" : "standalone")}  Port: {opts.Port}");
             IClusterFactory clusterFactory = null;
             if (opts.EnableCluster) clusterFactory = new ClusterFactory();
 
@@ -329,7 +326,7 @@ namespace Garnet
             }
         }
 
-        private void InternalDispose()
+        void InternalDispose()
         {
             Provider?.Dispose();
             server.Dispose();
@@ -350,7 +347,7 @@ namespace Garnet
                 loggerFactory?.Dispose();
         }
 
-        private static void DeleteDirectory(string path)
+        static void DeleteDirectory(string path)
         {
             if (path == null) return;
 
@@ -382,7 +379,7 @@ namespace Garnet
         /// <param name="memoryLogger">The memory logger</param>
         /// <param name="categoryName">The category name of the destination logger</param>
         /// <param name="dstLoggerFactory">Optional logger factory for creating the destination logger</param>
-        private static void FlushMemoryLogger(MemoryLogger memoryLogger, string categoryName, ILoggerFactory dstLoggerFactory = null)
+        static void FlushMemoryLogger(MemoryLogger memoryLogger, string categoryName, ILoggerFactory dstLoggerFactory = null)
         {
             if (memoryLogger == null) return;
 
