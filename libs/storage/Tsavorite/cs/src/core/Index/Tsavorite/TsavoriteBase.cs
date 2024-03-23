@@ -111,12 +111,15 @@ namespace Tsavorite.core
             var sectorAlignedPointer = ((long)unmanagedMemory + (sector_size - 1)) & ~(sector_size - 1);
             state[version].tableAligned = (HashBucket*)sectorAlignedPointer;
         }
+
+
         /// <summary>
         /// 老的初始化方法，有内存溢出的问题
         /// </summary>
         /// <param name="version"></param>
         /// <param name="size"></param>
         /// <param name="sector_size"></param>
+        [Obsolete]
         internal void _Initialize(int version, long size, int sector_size)
         {
             long size_bytes = size * sizeof(HashBucket);
@@ -198,7 +201,6 @@ namespace Tsavorite.core
                 hei.entry.Tag = hei.tag;
                 hei.entry.Address = Constants.kTempInvalidAddress;
                 hei.entry.Tentative = true;
-
                 // 将此标签插入到此插槽中。失败意味着另一个会话将键插入到该插槽中，因此继续循环以查找另一个空闲插槽。
                 if (0 == Interlocked.CompareExchange(ref hei.bucket->bucket_entries[hei.slot], hei.entry.word, 0))
                 {
@@ -222,19 +224,18 @@ namespace Tsavorite.core
             }
         }
 
-        /// <summary>
-        /// Find existing entry (non-tentative) entry.
-        /// </summary>
-        /// <returns>If found, return the slot it is in, else return a pointer to some empty slot (which we may have allocated)</returns>
+        ///<summary>
+        /// 查找现有的（非临时）条目。
+        ///<returns>如果找到，则返回它所在的插槽，否则返回一个指向某个空插槽的指针（可能已经分配了）</returns>
+        ///</summary>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool FindTagOrFreeInternal(ref HashEntryInfo hei, long BeginAddress = 0)
         {
             var target_entry_word = default(long);
             var entry_slot_bucket = default(HashBucket*);
-
             do
             {
-                // Search through the bucket looking for our key. Last entry is reserved for the overflow pointer.
+                // 在桶中搜索键。最后一个条目是为溢出指针保留的。
                 for (int index = 0; index < Constants.kOverflowBucketIndex; ++index)
                 {
                     target_entry_word = *(((long*)hei.bucket) + index);
@@ -242,14 +243,14 @@ namespace Tsavorite.core
                     {
                         if (hei.slot == Constants.kInvalidEntrySlot)
                         {
-                            // Record the free slot and continue to search for the key
+                            // 记录空闲插槽并继续搜索键
                             hei.slot = index;
                             entry_slot_bucket = hei.bucket;
                         }
                         continue;
                     }
 
-                    // If the entry points to an address that has been truncated, it's free; try to reclaim it by setting its word to 0.
+                    // 如果条目指向已被截断的地址，则它是空闲的；尝试通过将其字设置为0来回收它。
                     hei.entry.word = target_entry_word;
                     if (hei.entry.Address < BeginAddress && hei.entry.Address != Constants.kTempInvalidAddress)
                     {
@@ -257,7 +258,7 @@ namespace Tsavorite.core
                         {
                             if (hei.slot == Constants.kInvalidEntrySlot)
                             {
-                                // Record the free slot and continue to search for the key
+                                // 记录空闲插槽并继续搜索键
                                 hei.slot = index;
                                 entry_slot_bucket = hei.bucket;
                             }
@@ -271,14 +272,14 @@ namespace Tsavorite.core
                     }
                 }
 
-                // Go to next bucket in the chain (if it is a nonzero overflow allocation). Don't mask off the non-address bits here; they're needed for CAS.
+                // 转到链中的下一个桶（如果它是一个非零溢出分配）。不要在这里屏蔽非地址位，因为CAS需要它们。
                 target_entry_word = *(((long*)hei.bucket) + Constants.kOverflowBucketIndex);
                 while ((target_entry_word & Constants.kAddressMask) == 0)
                 {
-                    // There is no next bucket. If slot is Constants.kInvalidEntrySlot then we did not find an empty slot, so must allocate a new bucket.
+                    // 没有下一个桶。如果插槽是Constants.kInvalidEntrySlot，则我们没有找到空插槽，因此必须分配新桶。
                     if (hei.slot == Constants.kInvalidEntrySlot)
                     {
-                        // Allocate new bucket
+                        // 分配新桶
                         var logicalBucketAddress = overflowBucketsAllocator.Allocate();
                         var physicalBucketAddress = (HashBucket*)overflowBucketsAllocator.GetPhysicalAddress(logicalBucketAddress);
                         long compare_word = target_entry_word;
@@ -289,47 +290,44 @@ namespace Tsavorite.core
                             ref hei.bucket->bucket_entries[Constants.kOverflowBucketIndex],
                             target_entry_word,
                             compare_word);
-
                         if (compare_word != result_word)
                         {
-                            // Install of new bucket failed; free the allocation and and continue the search using the winner's entry
+                            // 新桶的安装失败；释放分配并继续使用赢家的条目
                             overflowBucketsAllocator.Free(logicalBucketAddress);
                             target_entry_word = result_word;
                             continue;
                         }
 
-                        // Install of new overflow bucket succeeded; the tag was not found, so return the first slot of the new bucket
+                        // 新溢出桶的安装成功；标签未找到，因此返回新桶的第一个插槽
                         hei.bucket = physicalBucketAddress;
                         hei.slot = 0;
                         hei.entry = default;
-                        return false;   // tag was not found
+                        return false;   // 标签未找到
                     }
 
-                    // Tag was not found and an empty slot was found, so return the empty slot
+                    // 标签未找到且找到了空插槽，因此返回空插槽
                     hei.bucket = entry_slot_bucket;
                     hei.entry = default;
-                    return false;       // tag was not found
+                    return false;       // 标签未找到
                 }
 
-                // The next bucket was there or was allocated. Move to it.
+                // 下一个桶已存在或已分配。转到它。
                 hei.bucket = (HashBucket*)overflowBucketsAllocator.GetPhysicalAddress(target_entry_word & Constants.kAddressMask);
             } while (true);
         }
 
-
-        /// <summary>
-        /// Look for an existing entry (tentative or otherwise) for this hash/tag, other than the specified "except for this" bucket/slot.
+        //<summary>
+        /// 查找此哈希/标签的现有条目（可能是临时的），除了指定的“除此之外”桶/插槽。
         /// </summary>
-        /// <returns>True if found, else false. Does not return a free slot.</returns>
+        ///<returns>如果找到，则返回true，否则返回false。不返回空闲插槽。</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         bool FindOtherSlotForThisTagMaybeTentativeInternal(ushort tag, ref HashBucket* bucket, ref int slot, HashBucket* except_bucket, int except_entry_slot)
         {
             var target_entry_word = default(long);
             var entry_slot_bucket = default(HashBucket*);
-
             do
             {
-                // Search through the bucket looking for our key. Last entry is reserved for the overflow pointer.
+                // 在桶中搜索我们的键。最后一个条目是为溢出指针保留的。
                 for (int index = 0; index < Constants.kOverflowBucketIndex; ++index)
                 {
                     target_entry_word = *(((long*)bucket) + index);
@@ -347,7 +345,7 @@ namespace Tsavorite.core
                     }
                 }
 
-                // Go to next bucket in the chain (if it is a nonzero overflow allocation).
+                // 转到链中的下一个桶（如果它是一个非零溢出分配）。
                 target_entry_word = *(((long*)bucket) + Constants.kOverflowBucketIndex) & Constants.kAddressMask;
                 if (target_entry_word == 0)
                     return false;
@@ -355,16 +353,15 @@ namespace Tsavorite.core
             } while (true);
         }
 
-        /// <summary>
-        /// Helper function used to update the slot atomically with the
-        /// new offset value using the CAS operation
+        ///<summary>
+        /// 用于使用CAS操作以原子方式更新插槽的辅助函数，新的偏移值
+        ///<param name="bucket"></param>
+        ///<param name="entrySlot"></param>
+        ///<param name="expected"></param>
+        ///<param name="desired"></param>
+        ///<param name="found"></param>
+        ///<returns>是否更新成功</returns>
         /// </summary>
-        /// <param name="bucket"></param>
-        /// <param name="entrySlot"></param>
-        /// <param name="expected"></param>
-        /// <param name="desired"></param>
-        /// <param name="found"></param>
-        /// <returns>If atomic update was successful</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal bool UpdateSlot(HashBucket* bucket, int entrySlot, long expected, long desired, out long found)
         {
