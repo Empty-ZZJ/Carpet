@@ -62,22 +62,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Garnet.cluster", "libs\clus
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Garnet.host", "libs\host\Garnet.host.csproj", "{A5D29D02-5883-4DB8-BE12-9C223139815E}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = ".azure", ".azure", "{4485E56B-C60D-4994-9C5E-D3A9639EE43A}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "pipelines", "pipelines", "{4CEA9C01-1519-4D1A-B096-B3208896496A}"
-	ProjectSection(SolutionItems) = preProject
-		.azure\pipelines\azure-pipelines-compliance-policheck.yml = .azure\pipelines\azure-pipelines-compliance-policheck.yml
-		.azure\pipelines\azure-pipelines-compliance.yml = .azure\pipelines\azure-pipelines-compliance.yml
-		.azure\pipelines\azure-pipelines-external-release.yml = .azure\pipelines\azure-pipelines-external-release.yml
-		.azure\pipelines\azure-pipelines-internal-release.yml = .azure\pipelines\azure-pipelines-internal-release.yml
-		.azure\pipelines\azure-pipelines-tsavorite-codecoverage.yml = .azure\pipelines\azure-pipelines-tsavorite-codecoverage.yml
-		.azure\pipelines\azure-pipelines-tsavorite.yml = .azure\pipelines\azure-pipelines-tsavorite.yml
-		.azure\pipelines\azure-pipelines.yml = .azure\pipelines\azure-pipelines.yml
-		.azure\pipelines\CodeCoverage.runsettings = .azure\pipelines\CodeCoverage.runsettings
-		.azure\pipelines\credscan-exclusion.json = .azure\pipelines\credscan-exclusion.json
-		policheck-exclusion.xml = policheck-exclusion.xml
-	EndProjectSection
-EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Garnet.test.cluster", "test\Garnet.test.cluster\Garnet.test.cluster.csproj", "{FE775048-3DB9-4F9E-A715-06C0E319BA63}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClusterStress", "playground\ClusterStress\ClusterStress.csproj", "{8941A05C-099B-45AC-A7BF-F0E226BD59A8}"
@@ -266,7 +250,6 @@ Global
 		{9D5C0F15-D9E8-4F1B-BBA2-B604E0F91E95} = {B01808A2-0103-4580-9F01-18AADBCFEAF5}
 		{132A978C-144D-4436-8833-FF5A94616CC5} = {147FCE31-EC09-4C90-8E4D-37CA87ED18C3}
 		{A5D29D02-5883-4DB8-BE12-9C223139815E} = {147FCE31-EC09-4C90-8E4D-37CA87ED18C3}
-		{4CEA9C01-1519-4D1A-B096-B3208896496A} = {4485E56B-C60D-4994-9C5E-D3A9639EE43A}
 		{FE775048-3DB9-4F9E-A715-06C0E319BA63} = {9A03717A-4E0B-49CA-8579-A02A4C1D003F}
 		{8941A05C-099B-45AC-A7BF-F0E226BD59A8} = {69A71E2C-00E3-42F3-854E-BE157A24834E}
 		{5BEDAC1F-6458-4EBA-8174-EC06B07F2132} = {69A71E2C-00E3-42F3-854E-BE157A24834E}
